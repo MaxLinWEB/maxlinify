@@ -20,9 +20,9 @@ const GRID_GAP = 24;
 const COL_W = (SW - spacing.screenPadding * 2 - GRID_GAP) / 2;
 
 const RECENT_SEARCHES = [
-  { id: '1', name: 'Synthwave Afterlife', type: 'Playlist', image: require('../../assets/images/01f70a6d0935b1e96590b9a37f8f8053b79a9341.png') },
-  { id: '2', name: 'Miles Davis', type: 'Artist', image: require('../../assets/images/0547279d628bd9b44a2e7158ea46b880e382ea61.png') },
-  { id: '3', name: 'Lofi Beats 2024', type: 'Album', image: require('../../assets/images/09f1006d56ca738557d3fbcba668c8795a5b567d.png') },
+  { id: '1', name: 'Synthwave Afterlife', type: 'Playlist', image: require('../../assets/images/01f70a6d0935b1e96590b9a37f8f8053b79a9341.jpg') },
+  { id: '2', name: 'Miles Davis', type: 'Artist', image: require('../../assets/images/0547279d628bd9b44a2e7158ea46b880e382ea61.jpg') },
+  { id: '3', name: 'Lofi Beats 2024', type: 'Album', image: require('../../assets/images/09f1006d56ca738557d3fbcba668c8795a5b567d.jpg') },
 ];
 
 const CATEGORIES = [

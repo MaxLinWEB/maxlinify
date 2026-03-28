@@ -11,67 +11,67 @@ const BENTO_HALF = (SCREEN_W - spacing.screenPadding * 2 - BENTO_GAP) / 2;
 const MIX_CARD_W = (SCREEN_W - spacing.screenPadding * 2 - 16) / 2;
 
 // Image assets
-const HERO_IMAGE = require('../../assets/images/5ca80e82823bf9531a84296107ea788e9b4ae244.png');
-const LOGO_IMAGE = require('../../assets/images/11d3c7cfd916f92a90f96ac8a0e05dc49b7473d6.png');
+const HERO_IMAGE = require('../../assets/images/5ca80e82823bf9531a84296107ea788e9b4ae244.jpg');
+const LOGO_IMAGE = require('../../assets/images/11d3c7cfd916f92a90f96ac8a0e05dc49b7473d6.jpg');
 
 const JUMP_BACK_IN = [
   {
     id: '1',
     title: 'Soul Sessions',
     artist: 'Ariel Vibe',
-    image: require('../../assets/images/3e518d173ab6921e86cee7290fba2fca28654555.png'),
+    image: require('../../assets/images/3e518d173ab6921e86cee7290fba2fca28654555.jpg'),
   },
   {
     id: '2',
     title: 'Midnight Rave',
     artist: 'Collective',
-    image: require('../../assets/images/885273e7e9b84061200dd12e00153d3af1f9ff8b.png'),
+    image: require('../../assets/images/885273e7e9b84061200dd12e00153d3af1f9ff8b.jpg'),
   },
   {
     id: '3',
     title: 'Lo-fi Beats',
     artist: 'Coffee Morning',
-    image: require('../../assets/images/09f1006d56ca738557d3fbcba668c8795a5b567d.png'),
+    image: require('../../assets/images/09f1006d56ca738557d3fbcba668c8795a5b567d.jpg'),
   },
   {
     id: '4',
     title: 'Modern Jazz',
     artist: 'Night Quintet',
-    image: require('../../assets/images/832999fface0889a2d3395f01f32d48ea18d6d05.png'),
+    image: require('../../assets/images/832999fface0889a2d3395f01f32d48ea18d6d05.jpg'),
   },
 ];
 
-const ULTRA_BASS_IMAGE = require('../../assets/images/bca4e37e60659dc2741756e0f8ada31a5b4a6701.png');
+const ULTRA_BASS_IMAGE = require('../../assets/images/bca4e37e60659dc2741756e0f8ada31a5b4a6701.jpg');
 
 const TOP_ARTISTS = [
   {
     id: '1',
     name: 'Zade Flux',
-    image: require('../../assets/images/2f71927052d3f161efe2fc72a97ea8e70aa2273d.png'),
+    image: require('../../assets/images/2f71927052d3f161efe2fc72a97ea8e70aa2273d.jpg'),
     active: true,
   },
   {
     id: '2',
     name: 'Luna Skye',
-    image: require('../../assets/images/38358840cdac4d0e9b88db2a02d08f54487c8392.png'),
+    image: require('../../assets/images/38358840cdac4d0e9b88db2a02d08f54487c8392.jpg'),
     active: false,
   },
   {
     id: '3',
     name: 'Marcus Grey',
-    image: require('../../assets/images/553475d46c989856b8cd04ac357408f87a72740b.png'),
+    image: require('../../assets/images/553475d46c989856b8cd04ac357408f87a72740b.jpg'),
     active: false,
   },
   {
     id: '4',
     name: 'Elias Blue',
-    image: require('../../assets/images/e8782826383e466be1ac64e94fff13c1382be97e.png'),
+    image: require('../../assets/images/e8782826383e466be1ac64e94fff13c1382be97e.jpg'),
     active: false,
   },
   {
     id: '5',
     name: 'Synthetix',
-    image: require('../../assets/images/d95dea049a6294dce8b0a2ed34eb6e02db197d1d.png'),
+    image: require('../../assets/images/d95dea049a6294dce8b0a2ed34eb6e02db197d1d.jpg'),
     active: false,
   },
 ];
@@ -81,13 +81,13 @@ const PERSONAL_MIXES = [
     id: '1',
     title: 'Daily Mix 1',
     subtitle: '6 songs \u2022 Made for you',
-    image: require('../../assets/images/7a2b988ddf6f035f19267befea55369245cd0749.png'),
+    image: require('../../assets/images/7a2b988ddf6f035f19267befea55369245cd0749.jpg'),
   },
   {
     id: '2',
     title: 'Discovery Weekly',
     subtitle: '30 songs \u2022 Updated Fri',
-    image: require('../../assets/images/ae15f3c110d400c31008087ccde1b830718dc4ba.png'),
+    image: require('../../assets/images/ae15f3c110d400c31008087ccde1b830718dc4ba.jpg'),
   },
 ];
 

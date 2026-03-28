@@ -4,7 +4,7 @@
     "slug": "maxlinify",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/icon.jpg",
     "scheme": "maxlinify",
     "userInterfaceStyle": "dark",
     "splash": {
@@ -22,7 +22,7 @@
     "android": {
       "package": "com.maxlinify.app",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
+        "foregroundImage": "./assets/images/icon.jpg",
         "backgroundColor": "#0e0e0e"
       },
       "permissions": [

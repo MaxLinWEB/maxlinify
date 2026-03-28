@@ -26,12 +26,12 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 WORKDIR /app
 
-# Copy shared types
-COPY ../shared /shared
-COPY package*.json ./
+# Copy shared types (context is monorepo root via docker-compose)
+COPY shared/ /app/shared/
+COPY backend/package*.json ./
 RUN npm ci --only=production
 
-COPY . .
+COPY backend/ .
 RUN npm run build
 
 EXPOSE 3000

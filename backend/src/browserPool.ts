@@ -1,7 +1,8 @@
-import puppeteer from 'puppeteer-extra';
+import puppeteerExtra from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import type { Browser, Page } from 'puppeteer-core';
 
+const puppeteer = puppeteerExtra as any;
 puppeteer.use(StealthPlugin());
 
 const BROWSER_ARGS = [

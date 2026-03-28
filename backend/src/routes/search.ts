@@ -1,9 +1,20 @@
 import { Router } from 'express';
 import { getCached, setCache, SEARCH_TTL } from '../cache.js';
-import { getAllScrapers } from '../scrapers/index.js';
+import { getAllScrapers, recordScraperFailure, recordScraperSuccess } from '../scrapers/index.js';
 import type { SearchResult } from '@maxlinify/shared';
 
 export const searchRouter = Router();
+
+const SCRAPER_TIMEOUT_MS = 8000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error('Scraper timeout')), ms)
+    ),
+  ]);
+}
 
 searchRouter.get('/search', async (req, res) => {
   try {
@@ -24,7 +35,16 @@ searchRouter.get('/search', async (req, res) => {
 
     const scrapers = getAllScrapers(sources);
     const results = await Promise.allSettled(
-      scrapers.map((scraper) => scraper.search(query))
+      scrapers.map(async ({ name, scraper }) => {
+        try {
+          const tracks = await withTimeout(scraper.search(query), SCRAPER_TIMEOUT_MS);
+          recordScraperSuccess(name);
+          return tracks;
+        } catch (err) {
+          recordScraperFailure(name);
+          throw err;
+        }
+      })
     );
 
     const combined: SearchResult[] = results

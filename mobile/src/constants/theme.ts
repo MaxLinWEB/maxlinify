@@ -1,3 +1,5 @@
+import type { TextStyle, ViewStyle } from 'react-native';
+
 export const colors = {
   // Backgrounds
   background: '#0e0e0e',
@@ -65,3 +67,87 @@ export const spacing = {
   screenPadding: 24,
   sectionGap: 40,
 } as const;
+
+export const typography: Record<string, TextStyle> = {
+  h1: {
+    fontFamily: 'PlusJakartaSans-ExtraBold',
+    fontSize: 36,
+    fontWeight: '800',
+    letterSpacing: -0.9,
+    lineHeight: 40,
+    color: '#ffffff',
+  },
+  h2: {
+    fontFamily: 'PlusJakartaSans-ExtraBold',
+    fontSize: 24,
+    fontWeight: '700',
+    letterSpacing: -0.6,
+    lineHeight: 32,
+    color: '#ffffff',
+  },
+  h3: {
+    fontFamily: 'PlusJakartaSans-ExtraBold',
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+    lineHeight: 28,
+    color: '#ffffff',
+  },
+  body: {
+    fontSize: 16,
+    fontWeight: '400',
+    lineHeight: 24,
+    color: '#ffffff',
+  },
+  bodySmall: {
+    fontSize: 14,
+    fontWeight: '400',
+    lineHeight: 20,
+    color: '#adaaaa',
+  },
+  caption: {
+    fontSize: 12,
+    fontWeight: '400',
+    lineHeight: 16,
+    color: '#adaaaa',
+  },
+  label: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: '#adaaaa',
+  },
+} as const;
+
+export const shadows: Record<string, ViewStyle> = {
+  card: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  elevated: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 25 },
+    shadowOpacity: 0.25,
+    shadowRadius: 50,
+    elevation: 15,
+  },
+  glow: {
+    shadowColor: 'rgba(58, 249, 231, 1)',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 30,
+    elevation: 8,
+  },
+} as const;
+
+export const layout = {
+  tabBarHeight: 88,
+  miniPlayerHeight: 72,
+  bottomListPadding: 184, // tabBar + miniPlayer + spacing
+} as const;
+
+export const hitSlopDefault = { top: 10, bottom: 10, left: 10, right: 10 } as const;

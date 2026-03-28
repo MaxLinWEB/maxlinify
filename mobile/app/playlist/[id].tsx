@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,7 +8,20 @@ import { useLibraryStore } from '@/store/libraryStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { TrackCard } from '@/components/TrackCard';
 import { EmptyState } from '@/components/EmptyState';
-import { colors, radii, spacing } from '@/constants/theme';
+import { hapticLight } from '@/utils/haptics';
+import { colors, radii, spacing, layout, hitSlopDefault } from '@/constants/theme';
+import type { SearchResult, StoredTrack } from '@maxlinify/shared';
+
+function storedToSearchResult(track: StoredTrack): SearchResult {
+  return {
+    id: track.id,
+    title: track.title,
+    artist: track.artist,
+    duration: track.duration,
+    coverUrl: track.coverUrl,
+    source: track.source,
+  };
+}
 
 export default function PlaylistDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -15,10 +29,23 @@ export default function PlaylistDetailScreen() {
   const playlist = useLibraryStore((s) => s.playlists.find((p) => p.id === id));
   const { setQueue, currentTrack } = usePlayerStore();
 
+  const handlePlayAll = useCallback(() => {
+    if (!playlist?.tracks.length) return;
+    hapticLight();
+    setQueue(playlist.tracks.map(storedToSearchResult), 0);
+  }, [playlist, setQueue]);
+
+  const handleTrackPress = useCallback((index: number) => {
+    if (!playlist) return;
+    hapticLight();
+    setQueue(playlist.tracks.map(storedToSearchResult), index);
+  }, [playlist, setQueue]);
+
   if (!playlist) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+          <Ionicons name="alert-circle-outline" size={48} color={colors.textSecondary} style={{ opacity: 0.3 }} />
           <Text style={{ color: colors.textSecondary, fontSize: 18 }}>Playlist not found</Text>
           <TouchableOpacity onPress={() => router.back()}>
             <Text style={{ color: colors.primary, fontSize: 16, fontWeight: '600' }}>Go back</Text>
@@ -32,7 +59,7 @@ export default function PlaylistDetailScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={hitSlopDefault}>
           <Ionicons name="chevron-back" size={28} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{playlist.name}</Text>
@@ -43,8 +70,13 @@ export default function PlaylistDetailScreen() {
       <View style={styles.info}>
         <Text style={styles.trackCount}>{playlist.tracks.length} songs</Text>
         {playlist.tracks.length > 0 && (
-          <TouchableOpacity onPress={() => setQueue(playlist.tracks as any, 0)}>
-            <LinearGradient colors={[colors.primary, colors.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.playAllBtn}>
+          <TouchableOpacity onPress={handlePlayAll}>
+            <LinearGradient
+              colors={[colors.primary, colors.primaryDark]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.playAllBtn}
+            >
               <Ionicons name="play" size={16} color={colors.teal} style={{ marginLeft: 2 }} />
               <Text style={styles.playAllText}>Play All</Text>
             </LinearGradient>
@@ -58,15 +90,21 @@ export default function PlaylistDetailScreen() {
         keyExtractor={(item) => item.id}
         renderItem={({ item, index }) => (
           <TrackCard
-            track={item as any}
-            onPress={() => setQueue(playlist.tracks as any, index)}
+            track={storedToSearchResult(item)}
+            onPress={() => handleTrackPress(index)}
             isPlaying={currentTrack?.id === item.id}
           />
         )}
         ListEmptyComponent={
-          <EmptyState icon="musical-notes" title="Empty playlist" message="Long-press a song in search to add it" />
+          <EmptyState
+            icon="musical-notes"
+            title="Empty playlist"
+            message="Long-press a song in search to add it here"
+            actionLabel="Browse Music"
+            onAction={() => router.push('/(tabs)/search')}
+          />
         }
-        contentContainerStyle={{ paddingBottom: 200 }}
+        contentContainerStyle={{ paddingBottom: layout.bottomListPadding }}
         showsVerticalScrollIndicator={false}
       />
     </SafeAreaView>
@@ -76,19 +114,35 @@ export default function PlaylistDetailScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.screenPadding, paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.screenPadding,
+    paddingVertical: 12,
   },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { color: colors.textPrimary, fontSize: 20, fontWeight: '700', flex: 1, textAlign: 'center' },
+  headerTitle: {
+    color: colors.textPrimary,
+    fontSize: 20,
+    fontWeight: '700',
+    flex: 1,
+    textAlign: 'center',
+  },
   info: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.screenPadding, paddingBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.screenPadding,
+    paddingBottom: 16,
   },
   trackCount: { color: colors.textSecondary, fontSize: 14, lineHeight: 16 },
   playAllBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingVertical: 10, paddingHorizontal: 20, borderRadius: radii.pill,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: radii.pill,
   },
   playAllText: { color: colors.teal, fontSize: 14, fontWeight: '700' },
 });

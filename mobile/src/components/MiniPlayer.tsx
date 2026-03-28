@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -10,65 +11,110 @@ import Animated, {
   withTiming,
   withSequence,
   withDelay,
+  withSpring,
+  runOnJS,
 } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { usePlayerStore } from '@/store/playerStore';
-import { colors, radii } from '@/constants/theme';
+import { hapticLight, hapticMedium } from '@/utils/haptics';
+import { colors, radii, hitSlopDefault, layout } from '@/constants/theme';
 
 export function MiniPlayer() {
   const router = useRouter();
-  const { currentTrack, isPlaying, isLoading, pause, resume } = usePlayerStore();
+  const { currentTrack, isPlaying, isLoading, position, duration, pause, resume, skipNext, skipPrevious } = usePlayerStore();
+  const translateX = useSharedValue(0);
 
   if (!currentTrack) return null;
 
-  return (
-    <TouchableOpacity
-      style={styles.container}
-      activeOpacity={0.9}
-      onPress={() => router.push('/player')}
-    >
-      {/* Album Art */}
-      <View style={styles.left}>
-        <Image
-          source={{ uri: currentTrack.coverUrl }}
-          style={styles.cover}
-          transition={200}
-        />
-        <View style={styles.info}>
-          <Text style={styles.title} numberOfLines={1}>
-            {currentTrack.title}
-          </Text>
-          <View style={styles.artistRow}>
-            <Text style={styles.artist} numberOfLines={1}>
-              {currentTrack.artist}
-            </Text>
-            {isPlaying && <EqualizerBars />}
-          </View>
-        </View>
-      </View>
+  const progress = duration > 0 ? position / duration : 0;
 
-      {/* Controls */}
-      <View style={styles.controls}>
-        <TouchableOpacity
-          style={styles.controlBtn}
-          onPress={() => { isPlaying ? pause() : resume(); }}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons
-            name={isLoading ? 'hourglass' : isPlaying ? 'pause' : 'play'}
-            size={20}
-            color={colors.textPrimary}
-            style={!isLoading && !isPlaying ? { marginLeft: 2 } : undefined}
+  const handleSkipNext = () => {
+    hapticMedium();
+    skipNext();
+  };
+
+  const handleSkipPrev = () => {
+    hapticMedium();
+    skipPrevious();
+  };
+
+  const panGesture = Gesture.Pan()
+    .activeOffsetX([-15, 15])
+    .onUpdate((e) => {
+      translateX.value = e.translationX * 0.6;
+    })
+    .onEnd((e) => {
+      if (e.translationX < -80) {
+        runOnJS(handleSkipNext)();
+      } else if (e.translationX > 80) {
+        runOnJS(handleSkipPrev)();
+      }
+      translateX.value = withSpring(0, { damping: 20, stiffness: 200 });
+    });
+
+  const panStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  return (
+    <GestureDetector gesture={panGesture}>
+      <Animated.View style={[styles.container, panStyle]}>
+        {/* Progress bar at top */}
+        <View style={styles.progressTrack}>
+          <LinearGradient
+            colors={[colors.primary, colors.accent]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[styles.progressFill, { width: `${Math.min(progress * 100, 100)}%` as any }]}
           />
-        </TouchableOpacity>
+        </View>
+
         <TouchableOpacity
-          style={styles.controlBtn}
-          onPress={() => usePlayerStore.getState().skipNext()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={styles.inner}
+          activeOpacity={0.9}
+          onPress={() => router.push('/player')}
         >
-          <Ionicons name="play-forward" size={20} color={colors.textSecondary} />
+          {/* Album Art */}
+          <View style={styles.left}>
+            <Image
+              source={{ uri: currentTrack.coverUrl }}
+              style={styles.cover}
+              transition={200}
+            />
+            <View style={styles.info}>
+              <Text style={styles.title} numberOfLines={1}>{currentTrack.title}</Text>
+              <View style={styles.artistRow}>
+                <Text style={styles.artist} numberOfLines={1}>{currentTrack.artist}</Text>
+                {isPlaying && <EqualizerBars />}
+              </View>
+            </View>
+          </View>
+
+          {/* Controls */}
+          <View style={styles.controls}>
+            <TouchableOpacity
+              style={styles.controlBtn}
+              onPress={() => { hapticLight(); isPlaying ? pause() : resume(); }}
+              hitSlop={hitSlopDefault}
+            >
+              <Ionicons
+                name={isLoading ? 'hourglass' : isPlaying ? 'pause' : 'play'}
+                size={20}
+                color={colors.textPrimary}
+                style={!isLoading && !isPlaying ? { marginLeft: 2 } : undefined}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.controlBtn}
+              onPress={handleSkipNext}
+              hitSlop={hitSlopDefault}
+            >
+              <Ionicons name="play-forward" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
         </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
+      </Animated.View>
+    </GestureDetector>
   );
 }
 
@@ -97,23 +143,33 @@ function EqBar({ height1, height2, duration, delay }: { height1: number; height2
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 96,
-    left: 16,
-    right: 16,
+    bottom: layout.tabBarHeight + 8,
+    left: 12,
+    right: 12,
     borderRadius: radii.xl,
     backgroundColor: colors.cardTranslucent80,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 12,
+    overflow: 'hidden',
+    zIndex: 50,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.3,
+    shadowRadius: 24,
+    elevation: 15,
+  },
+  progressTrack: {
+    height: 2,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  progressFill: {
+    height: 2,
+  },
+  inner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    zIndex: 50,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 25 },
-    shadowOpacity: 0.25,
-    shadowRadius: 50,
-    elevation: 15,
+    padding: 12,
   },
   left: {
     flexDirection: 'row',
@@ -147,12 +203,12 @@ const styles = StyleSheet.create({
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingRight: 8,
+    gap: 8,
+    paddingRight: 4,
   },
   controlBtn: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },

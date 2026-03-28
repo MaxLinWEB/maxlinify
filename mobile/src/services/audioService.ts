@@ -15,10 +15,8 @@ class AudioService {
   };
 
   async loadAndPlay(mp3Url: string): Promise<void> {
-    // Unload previous sound
     await this.unload();
 
-    // Configure audio session for background playback
     await Audio.setAudioModeAsync({
       allowsRecordingIOS: false,
       staysActiveInBackground: true,

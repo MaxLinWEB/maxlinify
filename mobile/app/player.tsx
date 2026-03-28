@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,28 +7,32 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePlayerStore } from '@/store/playerStore';
 import { useLibraryStore } from '@/store/libraryStore';
+import { useResponsive } from '@/hooks/useResponsive';
 import { ProgressBar } from '@/components/ProgressBar';
 import { LyricsView } from '@/components/LyricsView';
-import { colors, fonts, radii, spacing } from '@/constants/theme';
+import { hapticLight, hapticMedium, hapticSelection } from '@/utils/haptics';
+import { colors, fonts, radii, spacing, shadows, hitSlopDefault } from '@/constants/theme';
 import { formatTime } from '@/utils/formatTime';
-
-const { width: SW } = Dimensions.get('window');
-const ART_SIZE = SW - 48;
-const ART_HEIGHT = 342;
 
 export default function PlayerScreen() {
   const router = useRouter();
   const [showLyrics, setShowLyrics] = useState(false);
+  const { width, scale } = useResponsive();
   const {
     currentTrack, isPlaying, position, duration, isLoading,
     pause, resume, seek, skipNext, skipPrevious,
+    shuffleEnabled, repeatMode, toggleShuffle, cycleRepeatMode,
   } = usePlayerStore();
   const { isFavorite, addFavorite, removeFavorite } = useLibraryStore();
+
+  const ART_SIZE = width - 48;
+  const ART_HEIGHT = Math.min(scale(342), width - 48);
 
   if (!currentTrack) {
     return (
       <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
-        <Text style={{ color: colors.textSecondary, fontSize: 18 }}>No track playing</Text>
+        <Ionicons name="musical-notes-outline" size={64} color={colors.textSecondary} style={{ opacity: 0.3 }} />
+        <Text style={{ color: colors.textSecondary, fontSize: 18, marginTop: 16 }}>No track playing</Text>
         <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 16 }}>
           <Text style={{ color: colors.primary, fontSize: 16, fontWeight: '600' }}>Go back</Text>
         </TouchableOpacity>
@@ -39,33 +43,59 @@ export default function PlayerScreen() {
   const progress = duration > 0 ? position / duration : 0;
   const liked = isFavorite(currentTrack.id);
 
+  const handlePlayPause = () => {
+    hapticLight();
+    isPlaying ? pause() : resume();
+  };
+
+  const handleSkipNext = () => {
+    hapticMedium();
+    skipNext();
+  };
+
+  const handleSkipPrev = () => {
+    hapticMedium();
+    skipPrevious();
+  };
+
+  const handleToggleShuffle = () => {
+    hapticSelection();
+    toggleShuffle();
+  };
+
+  const handleCycleRepeat = () => {
+    hapticSelection();
+    cycleRepeatMode();
+  };
+
+  const handleToggleLike = () => {
+    hapticSelection();
+    liked ? removeFavorite(currentTrack.id) : addFavorite(currentTrack);
+  };
+
   return (
     <View style={styles.container}>
-      {/* Layer 1: Blurred album artwork */}
+      {/* Background layers */}
       <Image source={{ uri: currentTrack.coverUrl }} style={styles.bgBlur} blurRadius={100} />
-      {/* Layer 2: Dark overlay */}
       <View style={styles.bgOverlay} />
-      {/* Layer 3: Radial glow top-left cyan */}
       <View style={styles.glowCyan} />
-      {/* Layer 4: Radial glow bottom-right green */}
       <View style={styles.glowGreen} />
 
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
         {/* Top Navigation */}
         <View style={styles.topBar}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.topBtn}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.topBtn} hitSlop={hitSlopDefault}>
             <Ionicons name="chevron-down" size={28} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.nowPlaying}>Now Playing</Text>
-          <TouchableOpacity style={styles.topBtn}>
+          <TouchableOpacity style={styles.topBtn} hitSlop={hitSlopDefault}>
             <Ionicons name="ellipsis-vertical" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* Album Artwork */}
-          <View style={styles.artContainer}>
-            {/* Dynamic glow behind artwork */}
+          <View style={[styles.artContainer, { width: ART_SIZE, height: ART_HEIGHT }]}>
             <View style={styles.artGlow} />
             <Image source={{ uri: currentTrack.coverUrl }} style={styles.artwork} transition={300} />
           </View>
@@ -76,14 +106,11 @@ export default function PlayerScreen() {
               <Text style={styles.trackTitle} numberOfLines={1}>{currentTrack.title}</Text>
               <Text style={styles.trackArtist} numberOfLines={1}>{currentTrack.artist}</Text>
             </View>
-            <TouchableOpacity
-              onPress={() => liked ? removeFavorite(currentTrack.id) : addFavorite(currentTrack)}
-              style={styles.heartBtn}
-            >
+            <TouchableOpacity onPress={handleToggleLike} style={styles.heartBtn} hitSlop={hitSlopDefault}>
               <Ionicons
                 name={liked ? 'heart' : 'heart-outline'}
                 size={25}
-                color={liked ? '#3af9e7' : '#adaaaa'}
+                color={liked ? colors.primary : colors.textSecondary}
               />
             </TouchableOpacity>
           </View>
@@ -99,31 +126,48 @@ export default function PlayerScreen() {
 
           {/* Playback Controls */}
           <View style={styles.controls}>
-            <TouchableOpacity style={styles.sideControl}>
-              <Ionicons name="shuffle" size={22} color="#adaaaa" />
+            <TouchableOpacity style={styles.sideControl} onPress={handleToggleShuffle} hitSlop={hitSlopDefault}>
+              <Ionicons name="shuffle" size={22} color={shuffleEnabled ? colors.primary : colors.textSecondary} />
+              {shuffleEnabled && <View style={styles.activeIndicator} />}
             </TouchableOpacity>
-            <TouchableOpacity onPress={skipPrevious} style={styles.skipControl}>
-              <Ionicons name="play-skip-back" size={24} color="#ffffff" />
+
+            <TouchableOpacity onPress={handleSkipPrev} style={styles.skipControl} hitSlop={hitSlopDefault}>
+              <Ionicons name="play-skip-back" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={isPlaying ? pause : resume} activeOpacity={0.85}>
+
+            <TouchableOpacity onPress={handlePlayPause} activeOpacity={0.85}>
               <LinearGradient
-                colors={['#3af9e7', '#17ead9']}
+                colors={[colors.primary, colors.primaryDark]}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={styles.playBtn}
+                style={[styles.playBtn, shadows.glow]}
               >
                 <Ionicons
                   name={isLoading ? 'hourglass' : isPlaying ? 'pause' : 'play'}
                   size={28}
-                  color="#005a53"
+                  color={colors.teal}
                   style={!isLoading && !isPlaying ? { marginLeft: 4 } : undefined}
                 />
               </LinearGradient>
             </TouchableOpacity>
-            <TouchableOpacity onPress={skipNext} style={styles.skipControl}>
-              <Ionicons name="play-skip-forward" size={24} color="#ffffff" />
+
+            <TouchableOpacity onPress={handleSkipNext} style={styles.skipControl} hitSlop={hitSlopDefault}>
+              <Ionicons name="play-skip-forward" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.sideControl}>
-              <Ionicons name="repeat" size={22} color="#2ff801" />
+
+            <TouchableOpacity style={styles.sideControl} onPress={handleCycleRepeat} hitSlop={hitSlopDefault}>
+              <View>
+                <Ionicons
+                  name="repeat"
+                  size={22}
+                  color={repeatMode !== 'off' ? colors.accent : colors.textSecondary}
+                />
+                {repeatMode === 'one' && (
+                  <View style={styles.repeatOneBadge}>
+                    <Text style={styles.repeatOneText}>1</Text>
+                  </View>
+                )}
+              </View>
+              {repeatMode !== 'off' && <View style={[styles.activeIndicator, { backgroundColor: colors.accent }]} />}
             </TouchableOpacity>
           </View>
 
@@ -135,7 +179,10 @@ export default function PlayerScreen() {
           </View>
 
           {/* Lyrics Toggle + Panel */}
-          <TouchableOpacity style={styles.lyricsToggle} onPress={() => setShowLyrics(!showLyrics)}>
+          <TouchableOpacity
+            style={styles.lyricsToggle}
+            onPress={() => { setShowLyrics(!showLyrics); hapticLight(); }}
+          >
             <Ionicons name="text" size={16} color={showLyrics ? colors.primary : colors.textSecondary} />
             <Text style={[styles.lyricsLabel, showLyrics && { color: colors.primary }]}>Lyrics</Text>
             <Ionicons name={showLyrics ? 'chevron-up' : 'chevron-down'} size={14} color={showLyrics ? colors.primary : colors.textSecondary} />
@@ -156,8 +203,8 @@ export default function PlayerScreen() {
 
 function ActionBtn({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; label: string }) {
   return (
-    <TouchableOpacity style={styles.actionBtn}>
-      <Ionicons name={icon} size={20} color="#adaaaa" />
+    <TouchableOpacity style={styles.actionBtn} hitSlop={hitSlopDefault}>
+      <Ionicons name={icon} size={20} color={colors.textSecondary} />
       <Text style={styles.actionLabel}>{label}</Text>
     </TouchableOpacity>
   );
@@ -183,7 +230,7 @@ const styles = StyleSheet.create({
     width: 400,
     height: 400,
     borderRadius: 200,
-    backgroundColor: 'rgba(58, 249, 231, 0.15)',
+    backgroundColor: 'rgba(58, 249, 231, 0.12)',
   },
   glowGreen: {
     position: 'absolute',
@@ -192,7 +239,7 @@ const styles = StyleSheet.create({
     width: 400,
     height: 400,
     borderRadius: 200,
-    backgroundColor: 'rgba(47, 248, 1, 0.1)',
+    backgroundColor: 'rgba(47, 248, 1, 0.08)',
   },
 
   // Top Navigation
@@ -201,7 +248,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 24,
-    paddingVertical: 16,
+    paddingVertical: 12,
   },
   topBtn: {
     width: 40,
@@ -210,11 +257,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   nowPlaying: {
-    fontFamily: fonts.subheading,
-    color: '#3af9e7',
-    fontSize: 16,
+    fontFamily: fonts.heading,
+    color: colors.primary,
+    fontSize: 14,
     fontWeight: '700',
-    letterSpacing: -0.4,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
 
   scrollContent: {
@@ -224,10 +272,8 @@ const styles = StyleSheet.create({
 
   // Album Artwork
   artContainer: {
-    width: ART_SIZE,
-    height: ART_HEIGHT,
     marginTop: 8,
-    marginBottom: 40,
+    marginBottom: 32,
   },
   artGlow: {
     position: 'absolute',
@@ -236,9 +282,8 @@ const styles = StyleSheet.create({
     right: -16,
     bottom: -16,
     borderRadius: radii.xl,
-    backgroundColor: 'rgba(58, 249, 231, 0.2)',
+    backgroundColor: 'rgba(58, 249, 231, 0.15)',
     opacity: 0.5,
-    // iOS shadow for blur glow effect
     shadowColor: '#3af9e7',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.3,
@@ -248,9 +293,8 @@ const styles = StyleSheet.create({
   artwork: {
     width: '100%',
     height: '100%',
-    borderRadius: 32,
+    borderRadius: 28,
     backgroundColor: colors.input,
-    // Shadow: 0px 25px 50px -12px rgba(0,0,0,0.25)
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 25 },
     shadowOpacity: 0.25,
@@ -264,7 +308,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
     justifyContent: 'space-between',
-    marginBottom: 32,
+    marginBottom: 28,
   },
   metaText: {
     flex: 1,
@@ -273,21 +317,21 @@ const styles = StyleSheet.create({
   },
   trackTitle: {
     fontFamily: fonts.heading,
-    color: '#ffffff',
-    fontSize: 30,
+    color: colors.textPrimary,
+    fontSize: 26,
     fontWeight: '800',
     letterSpacing: -0.75,
-    lineHeight: 36,
+    lineHeight: 32,
   },
   trackArtist: {
-    color: '#adaaaa',
-    fontSize: 18,
+    color: colors.textSecondary,
+    fontSize: 16,
     fontWeight: '500',
-    lineHeight: 28,
+    lineHeight: 24,
   },
   heartBtn: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -295,20 +339,20 @@ const styles = StyleSheet.create({
   // Progress Bar
   progressWrap: {
     width: '100%',
-    marginBottom: 32,
-    gap: 12,
+    marginBottom: 28,
+    gap: 10,
   },
   timeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   timeText: {
-    color: '#adaaaa',
+    color: colors.textSecondary,
     fontSize: 12,
-    fontWeight: '400',
-    letterSpacing: 1.2,
+    fontWeight: '500',
+    letterSpacing: 0.5,
     lineHeight: 16,
-    opacity: 0.7,
+    opacity: 0.8,
   },
 
   // Playback Controls
@@ -317,8 +361,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    gap: 32,
-    marginBottom: 32,
+    gap: 28,
+    marginBottom: 28,
   },
   sideControl: {
     width: 40,
@@ -333,24 +377,41 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   playBtn: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    // Shadow: 0px 0px 30px rgba(58,249,231,0.4)
-    shadowColor: 'rgba(58, 249, 231, 1)',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 30,
-    elevation: 8,
+  },
+  activeIndicator: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.primary,
+    marginTop: 4,
+  },
+  repeatOneBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -6,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  repeatOneText: {
+    color: colors.background,
+    fontSize: 8,
+    fontWeight: '800',
   },
 
   // Additional Actions
   actions: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 68.4,
+    gap: 56,
     marginBottom: 24,
   },
   actionBtn: {
@@ -358,11 +419,11 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   actionLabel: {
-    color: '#adaaaa',
+    color: colors.textSecondary,
     fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: -0.5,
+    letterSpacing: 0.5,
   },
 
   // Lyrics

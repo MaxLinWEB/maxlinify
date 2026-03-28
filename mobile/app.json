@@ -28,7 +28,10 @@
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.WAKE_LOCK"
       ]
     },
     "plugins": [
@@ -41,7 +44,14 @@
         {
           "backgroundColor": "#0e0e0e",
           "image": "./assets/images/icon.jpg",
-          "imageWidth": 100
+          "imageWidth": 200
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.jpg",
+          "color": "#3af9e7"
         }
       ]
     ],
@@ -52,7 +62,8 @@
       },
       "eas": {
         "projectId": "746cdecc-2f8e-4c0d-b541-1c4b732d3215"
-      }
+      },
+      "apiUrl": ""
     },
     "owner": "maxlin123"
   }

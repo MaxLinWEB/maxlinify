@@ -132,7 +132,7 @@ class SefonScraper implements Scraper {
       // Try clicking the play button to trigger MP3 request
       try {
         await page.click('.play-btn, .btn-play, [class*="play"], .player-btn');
-        await page.waitForTimeout(2000);
+        await new Promise((r) => setTimeout(r, 2000));
       } catch {
         // Play button not found, try alternative approach
       }

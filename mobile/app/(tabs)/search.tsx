@@ -1,38 +1,34 @@
-import { useState, useCallback } from 'react';
-import { View, Text, TextInput, FlatList, ScrollView, TouchableOpacity, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
+import { useState, useCallback, useEffect } from 'react';
+import { View, Text, TextInput, FlatList, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams } from 'expo-router';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useResponsive } from '@/hooks/useResponsive';
 import { musicApi } from '@/services/api';
 import { usePlayerStore } from '@/store/playerStore';
 import { useLibraryStore } from '@/store/libraryStore';
+import { useSearchStore } from '@/store/searchStore';
 import { TrackCard } from '@/components/TrackCard';
 import { EmptyState } from '@/components/EmptyState';
+import { ErrorRetry } from '@/components/ErrorRetry';
 import { BottomSheet } from '@/components/BottomSheet';
-import { colors, radii, spacing } from '@/constants/theme';
+import { SkeletonTrackCard } from '@/components/Skeleton';
+import { hapticLight, hapticSelection } from '@/utils/haptics';
+import { colors, radii, spacing, layout } from '@/constants/theme';
 import type { SearchResult } from '@maxlinify/shared';
 
-const { width: SW } = Dimensions.get('window');
-const GRID_GAP = 24;
-const COL_W = (SW - spacing.screenPadding * 2 - GRID_GAP) / 2;
-
-const RECENT_SEARCHES = [
-  { id: '1', name: 'Synthwave Afterlife', type: 'Playlist', image: require('../../assets/images/01f70a6d0935b1e96590b9a37f8f8053b79a9341.jpg') },
-  { id: '2', name: 'Miles Davis', type: 'Artist', image: require('../../assets/images/0547279d628bd9b44a2e7158ea46b880e382ea61.jpg') },
-  { id: '3', name: 'Lofi Beats 2024', type: 'Album', image: require('../../assets/images/09f1006d56ca738557d3fbcba668c8795a5b567d.jpg') },
-];
-
 const CATEGORIES = [
-  { title: 'Electronic', grad: ['rgb(26,26,26)', 'rgb(38,38,38)'] as [string, string], overlay: 'rgba(58,249,231,0.3)', h: 159, angle: 135 },
-  { title: 'Synthwave', grad: ['rgb(19,19,19)', 'rgb(32,32,31)'] as [string, string], overlay: 'rgba(47,248,1,0.2)', h: 159, angle: 135 },
-  { title: 'Lo-fi', grad: ['rgb(26,26,26)', 'rgb(38,38,38)'] as [string, string], overlay: 'rgba(105,200,255,0.3)', h: 318, angle: 116.565 },
-  { title: 'Rock', grad: ['rgb(19,19,19)', 'rgb(32,32,31)'] as [string, string], overlay: 'rgba(255,113,108,0.2)', h: 159, angle: 135 },
-  { title: 'Hip Hop', grad: ['rgb(14,14,14)', 'rgb(38,38,38)'] as [string, string], overlay: 'rgba(53,246,228,0.3)', h: 159, angle: 135 },
-  { title: 'Podcasts', grad: ['rgb(19,19,19)', 'rgb(38,38,38)'] as [string, string], overlay: 'rgba(47,248,1,0.3)', h: 159, angle: 135 },
-  { title: 'New Releases', grad: ['rgb(19,19,19)', 'rgba(23,234,217,0.1)'] as [string, string], overlay: undefined, h: 159, angle: 135 },
+  { title: 'Electronic', grad: ['rgb(26,26,26)', 'rgb(38,38,38)'] as [string, string], overlay: 'rgba(58,249,231,0.3)', h: 150, angle: 135 },
+  { title: 'Synthwave', grad: ['rgb(19,19,19)', 'rgb(32,32,31)'] as [string, string], overlay: 'rgba(47,248,1,0.2)', h: 150, angle: 135 },
+  { title: 'Lo-fi', grad: ['rgb(26,26,26)', 'rgb(38,38,38)'] as [string, string], overlay: 'rgba(105,200,255,0.3)', h: 150, angle: 116 },
+  { title: 'Rock', grad: ['rgb(19,19,19)', 'rgb(32,32,31)'] as [string, string], overlay: 'rgba(255,113,108,0.2)', h: 150, angle: 135 },
+  { title: 'Hip Hop', grad: ['rgb(14,14,14)', 'rgb(38,38,38)'] as [string, string], overlay: 'rgba(53,246,228,0.3)', h: 150, angle: 135 },
+  { title: 'Podcasts', grad: ['rgb(19,19,19)', 'rgb(38,38,38)'] as [string, string], overlay: 'rgba(47,248,1,0.3)', h: 150, angle: 135 },
+  { title: 'New Releases', grad: ['rgb(19,19,19)', 'rgba(23,234,217,0.1)'] as [string, string], overlay: undefined, h: 150, angle: 135 },
+  { title: 'Jazz', grad: ['rgb(26,26,26)', 'rgb(38,38,38)'] as [string, string], overlay: 'rgba(249,115,22,0.25)', h: 150, angle: 135 },
 ];
 
 function degToVector(deg: number) {
@@ -45,34 +41,26 @@ function degToVector(deg: number) {
   };
 }
 
-function CatCard({ cat }: { cat: typeof CATEGORIES[0] }) {
-  const { start, end } = degToVector(cat.angle);
-  return (
-    <TouchableOpacity activeOpacity={0.8} style={{ width: COL_W, height: cat.h }}>
-      <LinearGradient
-        colors={cat.grad}
-        start={start}
-        end={end}
-        style={[styles.catCard, { height: cat.h }]}
-      >
-        {cat.overlay && (
-          <View style={[styles.catOverlay, { backgroundColor: cat.overlay }]} />
-        )}
-        <Text style={styles.catTitle}>{cat.title}</Text>
-      </LinearGradient>
-    </TouchableOpacity>
-  );
-}
-
 export default function SearchScreen() {
+  const params = useLocalSearchParams<{ q?: string }>();
   const [query, setQuery] = useState('');
   const [sheetTrack, setSheetTrack] = useState<SearchResult | null>(null);
   const debouncedQuery = useDebounce(query, 300);
+  const { width, screenPadding } = useResponsive();
   const { currentTrack, setQueue } = usePlayerStore();
   const { addFavorite, removeFavorite, isFavorite } = useLibraryStore();
+  const { recentSearches, addRecentSearch, removeRecentSearch, clearRecentSearches } = useSearchStore();
   const isSearching = debouncedQuery.length >= 2;
 
-  const { data: results, isLoading } = useQuery({
+  const GRID_GAP = 16;
+  const COL_W = (width - screenPadding * 2 - GRID_GAP) / 2;
+
+  // Pre-fill query from route params
+  useEffect(() => {
+    if (params.q) setQuery(params.q);
+  }, [params.q]);
+
+  const { data: results, isLoading, isError, refetch } = useQuery({
     queryKey: ['search', debouncedQuery],
     queryFn: () => musicApi.search(debouncedQuery),
     enabled: isSearching,
@@ -80,29 +68,43 @@ export default function SearchScreen() {
   });
 
   const handleTrackPress = useCallback((track: SearchResult) => {
+    hapticLight();
     if (results) {
       const idx = results.findIndex((r) => r.id === track.id);
       setQueue(results, idx >= 0 ? idx : 0);
     }
-  }, [results, setQueue]);
+    if (debouncedQuery.length >= 2) {
+      addRecentSearch(debouncedQuery);
+    }
+  }, [results, setQueue, debouncedQuery, addRecentSearch]);
+
+  const handleCategoryPress = useCallback((title: string) => {
+    hapticSelection();
+    setQuery(title);
+  }, []);
+
+  const handleRecentPress = useCallback((q: string) => {
+    hapticLight();
+    setQuery(q);
+  }, []);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       {/* Search Input */}
-      <View style={styles.inputWrap}>
-        <Ionicons name="search" size={18} color="#adaaaa" style={styles.inputIcon} />
+      <View style={[styles.inputWrap, { marginHorizontal: screenPadding }]}>
+        <Ionicons name="search" size={18} color={colors.textSecondary} style={styles.inputIcon} />
         <TextInput
           style={styles.input}
           placeholder="Artists, songs, or podcasts"
-          placeholderTextColor="#adaaaa"
+          placeholderTextColor={colors.textSecondary}
           value={query}
           onChangeText={setQuery}
           autoCorrect={false}
           returnKeyType="search"
         />
         {query.length > 0 && (
-          <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Ionicons name="close-circle" size={18} color="#adaaaa" />
+          <TouchableOpacity onPress={() => { setQuery(''); hapticLight(); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
         )}
       </View>
@@ -122,59 +124,79 @@ export default function SearchScreen() {
           )}
           ListEmptyComponent={
             isLoading ? (
-              <ActivityIndicator color={colors.primary} style={{ marginTop: 60 }} size="large" />
+              <View>
+                {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonTrackCard key={i} />)}
+              </View>
+            ) : isError ? (
+              <ErrorRetry message="Search failed. Check your connection." onRetry={() => refetch()} />
             ) : (
               <EmptyState icon="search" title="No results" message={`Nothing found for "${debouncedQuery}"`} />
             )
           }
-          contentContainerStyle={{ paddingBottom: 200 }}
+          contentContainerStyle={{ paddingBottom: layout.bottomListPadding }}
           showsVerticalScrollIndicator={false}
           windowSize={10}
           maxToRenderPerBatch={10}
         />
       ) : (
-        <ScrollView key="browse" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 200 }}>
+        <ScrollView key="browse" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: layout.bottomListPadding }}>
           {/* Recent Searches */}
-          <View style={styles.recentHeader}>
-            <Text style={styles.recentTitle}>Recent Searches</Text>
-            <TouchableOpacity>
-              <Text style={styles.clearAll}>Clear all</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recentScroll}>
-            {RECENT_SEARCHES.map((item) => (
-              <TouchableOpacity key={item.id} style={styles.recentChip} activeOpacity={0.7} onPress={() => setQuery(item.name)}>
-                <Image source={item.image} style={styles.recentAvatar} />
-                <View style={styles.recentInfo}>
-                  <Text style={styles.recentName} numberOfLines={1}>{item.name}</Text>
-                  <Text style={styles.recentType}>{item.type}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={14} color="#adaaaa" />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          {recentSearches.length > 0 && (
+            <>
+              <View style={[styles.recentHeader, { paddingHorizontal: screenPadding }]}>
+                <Text style={styles.recentTitle}>Recent Searches</Text>
+                <TouchableOpacity onPress={() => { clearRecentSearches(); hapticSelection(); }}>
+                  <Text style={styles.clearAll}>Clear all</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.recentScroll, { paddingHorizontal: screenPadding }]}>
+                {recentSearches.slice(0, 10).map((item) => (
+                  <TouchableOpacity
+                    key={item.query}
+                    style={styles.recentChip}
+                    activeOpacity={0.7}
+                    onPress={() => handleRecentPress(item.query)}
+                  >
+                    <Ionicons name="time-outline" size={16} color={colors.textSecondary} style={{ marginLeft: 4 }} />
+                    <Text style={styles.recentName} numberOfLines={1}>{item.query}</Text>
+                    <TouchableOpacity
+                      onPress={() => { removeRecentSearch(item.query); hapticLight(); }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="close" size={14} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </>
+          )}
 
           {/* Browse All */}
-          <Text style={styles.browseHeading}>Browse All</Text>
-          <View style={styles.catGrid}>
-            {/* Row 1: Electronic + Synthwave */}
-            <View style={styles.catRow}>
-              <CatCard cat={CATEGORIES[0]} />
-              <CatCard cat={CATEGORIES[1]} />
-            </View>
-            {/* Row 2: Lo-fi (tall) + Rock & Hip Hop stacked */}
-            <View style={styles.catRow}>
-              <CatCard cat={CATEGORIES[2]} />
-              <View style={{ gap: GRID_GAP, width: COL_W }}>
-                <CatCard cat={CATEGORIES[3]} />
-                <CatCard cat={CATEGORIES[4]} />
-              </View>
-            </View>
-            {/* Row 3: Podcasts + New Releases */}
-            <View style={styles.catRow}>
-              <CatCard cat={CATEGORIES[5]} />
-              <CatCard cat={CATEGORIES[6]} />
-            </View>
+          <Text style={[styles.browseHeading, { paddingHorizontal: screenPadding }]}>Browse All</Text>
+          <View style={[styles.catGrid, { paddingHorizontal: screenPadding }]}>
+            {CATEGORIES.map((cat) => {
+              const { start, end } = degToVector(cat.angle);
+              return (
+                <TouchableOpacity
+                  key={cat.title}
+                  activeOpacity={0.8}
+                  style={{ width: COL_W }}
+                  onPress={() => handleCategoryPress(cat.title)}
+                >
+                  <LinearGradient
+                    colors={cat.grad}
+                    start={start}
+                    end={end}
+                    style={[styles.catCard, { height: cat.h }]}
+                  >
+                    {cat.overlay && (
+                      <View style={[styles.catOverlay, { backgroundColor: cat.overlay }]} />
+                    )}
+                    <Text style={styles.catTitle}>{cat.title}</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </ScrollView>
       )}
@@ -187,7 +209,6 @@ export default function SearchScreen() {
         onAddToFavorites={() => {
           if (sheetTrack) isFavorite(sheetTrack.id) ? removeFavorite(sheetTrack.id) : addFavorite(sheetTrack);
         }}
-        onAddToPlaylist={() => {}}
         isFavorite={sheetTrack ? isFavorite(sheetTrack.id) : false}
       />
     </SafeAreaView>
@@ -204,25 +225,22 @@ const styles = StyleSheet.create({
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#262626',
-    borderRadius: 9999,
-    marginHorizontal: spacing.screenPadding,
+    backgroundColor: colors.input,
+    borderRadius: radii.pill,
     marginTop: 16,
     marginBottom: 24,
-    paddingLeft: 56,
-    paddingRight: 24,
-    paddingTop: 23,
-    paddingBottom: 24,
+    paddingLeft: 48,
+    paddingRight: 20,
+    height: 52,
   },
   inputIcon: {
     position: 'absolute',
-    left: 20,
+    left: 18,
   },
   input: {
     flex: 1,
     color: colors.textPrimary,
-    fontFamily: 'Inter_500Medium',
-    fontSize: 18,
+    fontSize: 16,
     padding: 0,
   },
 
@@ -231,91 +249,70 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.screenPadding,
     marginBottom: 16,
   },
   recentTitle: {
-    color: '#ffffff',
-    fontFamily: 'PlusJakartaSans-Bold',
+    color: colors.textPrimary,
+    fontFamily: 'PlusJakartaSans-ExtraBold',
     fontSize: 20,
     fontWeight: '700',
     letterSpacing: -0.5,
   },
   clearAll: {
-    color: '#3af9e7',
-    fontFamily: 'Inter_600SemiBold',
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '600',
   },
   recentScroll: {
-    paddingHorizontal: spacing.screenPadding,
-    gap: 12,
+    gap: 10,
+    marginBottom: 8,
   },
   recentChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#131313',
-    borderRadius: 9999,
-    paddingLeft: 8,
-    paddingRight: 16,
-    paddingVertical: 8,
-    height: 64,
-    gap: 12,
-  },
-  recentAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  recentInfo: {
-    gap: 2,
+    backgroundColor: colors.card,
+    borderRadius: radii.pill,
+    paddingLeft: 12,
+    paddingRight: 14,
+    paddingVertical: 10,
+    gap: 10,
   },
   recentName: {
-    color: '#ffffff',
-    fontFamily: 'Inter_700Bold',
+    color: colors.textPrimary,
     fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 17.5,
-  },
-  recentType: {
-    color: '#adaaaa',
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
+    fontWeight: '600',
+    maxWidth: 140,
   },
 
   // Browse All
   browseHeading: {
-    color: '#ffffff',
+    color: colors.textPrimary,
     fontFamily: 'PlusJakartaSans-ExtraBold',
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
     letterSpacing: -0.6,
-    paddingHorizontal: spacing.screenPadding,
-    marginTop: 32,
+    marginTop: 24,
     marginBottom: 16,
   },
   catGrid: {
-    paddingHorizontal: spacing.screenPadding,
-    gap: GRID_GAP,
-  },
-  catRow: {
     flexDirection: 'row',
-    gap: GRID_GAP,
+    flexWrap: 'wrap',
+    gap: 16,
   },
   catCard: {
-    borderRadius: 32,
+    borderRadius: radii.xl,
     overflow: 'hidden',
     justifyContent: 'flex-end',
     padding: 20,
   },
   catOverlay: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 32,
+    borderRadius: radii.xl,
   },
   catTitle: {
-    color: '#ffffff',
+    color: colors.textPrimary,
     fontFamily: 'PlusJakartaSans-ExtraBold',
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
     letterSpacing: -0.6,
   },

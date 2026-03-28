@@ -1,28 +1,40 @@
-import { Tabs } from 'expo-router';
 import { View, StyleSheet } from 'react-native';
+import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radii } from '@/constants/theme';
 import { MiniPlayer } from '@/components/MiniPlayer';
+import { hapticLight } from '@/utils/haptics';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, 16);
+  const tabBarHeight = 56 + bottomPadding;
+
   return (
     <View style={styles.container}>
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarStyle: styles.tabBar,
+          tabBarStyle: [styles.tabBar, { height: tabBarHeight, paddingBottom: bottomPadding }],
           tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.textSecondary,
           tabBarLabelStyle: styles.tabLabel,
           tabBarIconStyle: { marginBottom: -2 },
+        }}
+        screenListeners={{
+          tabPress: () => hapticLight(),
         }}
       >
         <Tabs.Screen
           name="index"
           options={{
             title: 'HOME',
-            tabBarIcon: ({ color }) => (
-              <Ionicons name="home" size={22} color={color} />
+            tabBarIcon: ({ color, focused }) => (
+              <View style={styles.tabIconWrap}>
+                <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
+                {focused && <View style={styles.activeIndicator} />}
+              </View>
             ),
           }}
         />
@@ -30,8 +42,11 @@ export default function TabLayout() {
           name="search"
           options={{
             title: 'SEARCH',
-            tabBarIcon: ({ color }) => (
-              <Ionicons name="search" size={22} color={color} />
+            tabBarIcon: ({ color, focused }) => (
+              <View style={styles.tabIconWrap}>
+                <Ionicons name={focused ? 'search' : 'search-outline'} size={22} color={color} />
+                {focused && <View style={styles.activeIndicator} />}
+              </View>
             ),
           }}
         />
@@ -39,8 +54,11 @@ export default function TabLayout() {
           name="library"
           options={{
             title: 'LIBRARY',
-            tabBarIcon: ({ color }) => (
-              <Ionicons name="library" size={22} color={color} />
+            tabBarIcon: ({ color, focused }) => (
+              <View style={styles.tabIconWrap}>
+                <Ionicons name={focused ? 'library' : 'library-outline'} size={22} color={color} />
+                {focused && <View style={styles.activeIndicator} />}
+              </View>
             ),
           }}
         />
@@ -65,9 +83,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 88,
-    paddingBottom: 32,
-    paddingTop: 12,
+    paddingTop: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -10 },
     shadowOpacity: 0.5,
@@ -78,5 +94,15 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1,
+  },
+  tabIconWrap: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  activeIndicator: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.primary,
   },
 });

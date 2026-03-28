@@ -1,189 +1,246 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, StyleSheet, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, fonts, radii, spacing } from '@/constants/theme';
+import { useRouter } from 'expo-router';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { musicApi } from '@/services/api';
+import { usePlayerStore } from '@/store/playerStore';
+import { useLibraryStore } from '@/store/libraryStore';
+import { useResponsive } from '@/hooks/useResponsive';
+import { hapticLight, hapticSelection } from '@/utils/haptics';
+import { SkeletonHero, SkeletonBentoGrid, SkeletonArtistRow } from '@/components/Skeleton';
+import { ErrorRetry } from '@/components/ErrorRetry';
+import { colors, fonts, radii, spacing, layout } from '@/constants/theme';
+import type { SearchResult } from '@maxlinify/shared';
 
-const { width: SCREEN_W } = Dimensions.get('window');
-const BENTO_GAP = 16;
-const BENTO_HALF = (SCREEN_W - spacing.screenPadding * 2 - BENTO_GAP) / 2;
-const MIX_CARD_W = (SCREEN_W - spacing.screenPadding * 2 - 16) / 2;
-
-// Image assets
+// Static fallback images
 const HERO_IMAGE = require('../../assets/images/5ca80e82823bf9531a84296107ea788e9b4ae244.jpg');
 const LOGO_IMAGE = require('../../assets/images/11d3c7cfd916f92a90f96ac8a0e05dc49b7473d6.jpg');
 
-const JUMP_BACK_IN = [
-  {
-    id: '1',
-    title: 'Soul Sessions',
-    artist: 'Ariel Vibe',
-    image: require('../../assets/images/3e518d173ab6921e86cee7290fba2fca28654555.jpg'),
-  },
-  {
-    id: '2',
-    title: 'Midnight Rave',
-    artist: 'Collective',
-    image: require('../../assets/images/885273e7e9b84061200dd12e00153d3af1f9ff8b.jpg'),
-  },
-  {
-    id: '3',
-    title: 'Lo-fi Beats',
-    artist: 'Coffee Morning',
-    image: require('../../assets/images/09f1006d56ca738557d3fbcba668c8795a5b567d.jpg'),
-  },
-  {
-    id: '4',
-    title: 'Modern Jazz',
-    artist: 'Night Quintet',
-    image: require('../../assets/images/832999fface0889a2d3395f01f32d48ea18d6d05.jpg'),
-  },
+const FALLBACK_ARTISTS = [
+  { id: '1', name: 'Zade Flux', image: require('../../assets/images/2f71927052d3f161efe2fc72a97ea8e70aa2273d.jpg'), active: true },
+  { id: '2', name: 'Luna Skye', image: require('../../assets/images/38358840cdac4d0e9b88db2a02d08f54487c8392.jpg'), active: false },
+  { id: '3', name: 'Marcus Grey', image: require('../../assets/images/553475d46c989856b8cd04ac357408f87a72740b.jpg'), active: false },
+  { id: '4', name: 'Elias Blue', image: require('../../assets/images/e8782826383e466be1ac64e94fff13c1382be97e.jpg'), active: false },
+  { id: '5', name: 'Synthetix', image: require('../../assets/images/d95dea049a6294dce8b0a2ed34eb6e02db197d1d.jpg'), active: false },
 ];
 
-const ULTRA_BASS_IMAGE = require('../../assets/images/bca4e37e60659dc2741756e0f8ada31a5b4a6701.jpg');
-
-const TOP_ARTISTS = [
-  {
-    id: '1',
-    name: 'Zade Flux',
-    image: require('../../assets/images/2f71927052d3f161efe2fc72a97ea8e70aa2273d.jpg'),
-    active: true,
-  },
-  {
-    id: '2',
-    name: 'Luna Skye',
-    image: require('../../assets/images/38358840cdac4d0e9b88db2a02d08f54487c8392.jpg'),
-    active: false,
-  },
-  {
-    id: '3',
-    name: 'Marcus Grey',
-    image: require('../../assets/images/553475d46c989856b8cd04ac357408f87a72740b.jpg'),
-    active: false,
-  },
-  {
-    id: '4',
-    name: 'Elias Blue',
-    image: require('../../assets/images/e8782826383e466be1ac64e94fff13c1382be97e.jpg'),
-    active: false,
-  },
-  {
-    id: '5',
-    name: 'Synthetix',
-    image: require('../../assets/images/d95dea049a6294dce8b0a2ed34eb6e02db197d1d.jpg'),
-    active: false,
-  },
-];
-
-const PERSONAL_MIXES = [
-  {
-    id: '1',
-    title: 'Daily Mix 1',
-    subtitle: '6 songs \u2022 Made for you',
-    image: require('../../assets/images/7a2b988ddf6f035f19267befea55369245cd0749.jpg'),
-  },
-  {
-    id: '2',
-    title: 'Discovery Weekly',
-    subtitle: '30 songs \u2022 Updated Fri',
-    image: require('../../assets/images/ae15f3c110d400c31008087ccde1b830718dc4ba.jpg'),
-  },
+const MIX_IMAGES = [
+  require('../../assets/images/7a2b988ddf6f035f19267befea55369245cd0749.jpg'),
+  require('../../assets/images/ae15f3c110d400c31008087ccde1b830718dc4ba.jpg'),
 ];
 
 export default function HomeScreen() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { width, scale, screenPadding } = useResponsive();
+  const { setQueue } = usePlayerStore();
+  const { favorites, isFavorite, addFavorite, removeFavorite } = useLibraryStore();
+
+  const BENTO_GAP = 16;
+  const BENTO_HALF = (width - screenPadding * 2 - BENTO_GAP) / 2;
+  const MIX_CARD_W = (width - screenPadding * 2 - 16) / 2;
+
+  // Dynamic content via search API
+  const {
+    data: trendingTracks,
+    isLoading: trendingLoading,
+    isError: trendingError,
+    refetch: refetchTrending,
+  } = useQuery({
+    queryKey: ['home-trending'],
+    queryFn: () => musicApi.search('trending hits'),
+    staleTime: 30 * 60 * 1000,
+  });
+
+  const {
+    data: lofiTracks,
+    isLoading: lofiLoading,
+    refetch: refetchLofi,
+  } = useQuery({
+    queryKey: ['home-lofi'],
+    queryFn: () => musicApi.search('lo-fi beats'),
+    staleTime: 30 * 60 * 1000,
+  });
+
+  const {
+    data: electronicTracks,
+    isLoading: electronicLoading,
+    refetch: refetchElectronic,
+  } = useQuery({
+    queryKey: ['home-electronic'],
+    queryFn: () => musicApi.search('electronic mix'),
+    staleTime: 30 * 60 * 1000,
+  });
+
+  const isRefreshing = trendingLoading && !!trendingTracks;
+  const bentoTracks = trendingTracks?.slice(0, 4) || [];
+  const fullWidthTrack = trendingTracks?.[4];
+  const heroTrack = trendingTracks?.[0];
+
+  const handleRefresh = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['home-trending'] });
+    queryClient.invalidateQueries({ queryKey: ['home-lofi'] });
+    queryClient.invalidateQueries({ queryKey: ['home-electronic'] });
+  }, [queryClient]);
+
+  const handleTrackPress = useCallback((tracks: SearchResult[], index: number) => {
+    hapticLight();
+    setQueue(tracks, index);
+  }, [setQueue]);
+
+  const handleHeroLike = useCallback(() => {
+    if (!heroTrack) return;
+    hapticSelection();
+    isFavorite(heroTrack.id) ? removeFavorite(heroTrack.id) : addFavorite(heroTrack);
+  }, [heroTrack, isFavorite, addFavorite, removeFavorite]);
+
+  const handleArtistPress = useCallback((name: string) => {
+    hapticLight();
+    router.push({ pathname: '/(tabs)/search', params: { q: name } });
+  }, [router]);
+
+  const handleProfilePress = useCallback(() => {
+    Alert.alert(
+      'MaxLinify',
+      'Version 1.0.0\nA modern music streaming experience.',
+      [{ text: 'OK' }],
+    );
+  }, []);
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingHorizontal: screenPadding }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logoRow}>
-            <LinearGradient
-              colors={[colors.primary, colors.primaryDark]}
-              style={styles.logoBadge}
-            >
+            <LinearGradient colors={[colors.primary, colors.primaryDark]} style={styles.logoBadge}>
               <Text style={styles.logoChar}>M</Text>
             </LinearGradient>
             <Text style={styles.logoText}>MaxLinify</Text>
           </View>
-          <TouchableOpacity style={styles.profileBtn}>
-            <View style={styles.profilePlaceholder} />
+          <TouchableOpacity onPress={handleProfilePress} activeOpacity={0.7}>
+            <LinearGradient
+              colors={[colors.primary, colors.accent]}
+              style={styles.profileBtn}
+            >
+              <View style={styles.profileInner}>
+                <Ionicons name="person" size={18} color={colors.textSecondary} />
+              </View>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
         {/* Hero Section */}
-        <View style={styles.heroCard}>
-          <Image source={HERO_IMAGE} style={styles.heroImage} contentFit="cover" />
-          <LinearGradient
-            colors={['transparent', 'rgba(14,14,14,0.4)', '#0e0e0e']}
-            style={styles.heroGradient}
-          />
-          <View style={styles.heroContent}>
-            <Text style={styles.heroLabel}>NEW RELEASE</Text>
-            <Text style={styles.heroTitle}>{'Neon Pulse\nAnthology'}</Text>
-            <View style={styles.heroActions}>
-              <TouchableOpacity activeOpacity={0.8}>
-                <LinearGradient
-                  colors={[colors.primary, colors.primaryDark]}
-                  start={{ x: 0.3, y: 0 }}
-                  end={{ x: 0.9, y: 1 }}
-                  style={styles.heroPlayBtn}
+        {trendingLoading && !trendingTracks ? (
+          <SkeletonHero />
+        ) : trendingError ? (
+          <ErrorRetry message="Couldn't load content" onRetry={() => refetchTrending()} />
+        ) : (
+          <View style={[styles.heroCard, { height: scale(214) }]}>
+            <Image
+              source={heroTrack?.coverUrl ? { uri: heroTrack.coverUrl } : HERO_IMAGE}
+              style={styles.heroImage}
+              contentFit="cover"
+            />
+            <LinearGradient colors={['transparent', 'rgba(14,14,14,0.4)', '#0e0e0e']} style={styles.heroGradient} />
+            <View style={styles.heroContent}>
+              <Text style={styles.heroLabel}>
+                {heroTrack ? 'TRENDING NOW' : 'NEW RELEASE'}
+              </Text>
+              <Text style={styles.heroTitle} numberOfLines={2}>
+                {heroTrack?.title || 'Neon Pulse\nAnthology'}
+              </Text>
+              {heroTrack && (
+                <Text style={styles.heroArtist} numberOfLines={1}>{heroTrack.artist}</Text>
+              )}
+              <View style={styles.heroActions}>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    if (trendingTracks?.length) handleTrackPress(trendingTracks, 0);
+                  }}
                 >
-                  <Ionicons name="play" size={14} color={colors.teal} style={{ marginLeft: 2 }} />
-                  <Text style={styles.heroPlayText}>Play Now</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.heroGlassBtn} activeOpacity={0.7}>
-                <Ionicons name="heart-outline" size={22} color="#ffffff" />
-              </TouchableOpacity>
+                  <LinearGradient
+                    colors={[colors.primary, colors.primaryDark]}
+                    start={{ x: 0.3, y: 0 }}
+                    end={{ x: 0.9, y: 1 }}
+                    style={styles.heroPlayBtn}
+                  >
+                    <Ionicons name="play" size={14} color={colors.teal} style={{ marginLeft: 2 }} />
+                    <Text style={styles.heroPlayText}>Play Now</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.heroGlassBtn} activeOpacity={0.7} onPress={handleHeroLike}>
+                  <Ionicons
+                    name={heroTrack && isFavorite(heroTrack.id) ? 'heart' : 'heart-outline'}
+                    size={22}
+                    color="#ffffff"
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        )}
 
         {/* Jump back in */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionHeading}>Jump back in</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push({ pathname: '/(tabs)/search', params: { q: 'trending' } })}>
               <Text style={styles.viewAll}>View All</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.bentoGrid}>
-            {JUMP_BACK_IN.map((item) => (
-              <TouchableOpacity key={item.id} style={styles.bentoCard} activeOpacity={0.8}>
-                <Image source={item.image} style={styles.bentoImage} contentFit="cover" />
-                <View style={styles.bentoTextWrap}>
-                  <Text style={styles.bentoTitle} numberOfLines={1}>
-                    {item.title}
-                  </Text>
-                  <Text style={styles.bentoSubtitle} numberOfLines={1}>
-                    {item.artist}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+          {trendingLoading && !trendingTracks ? (
+            <SkeletonBentoGrid />
+          ) : (
+            <View style={styles.bentoGrid}>
+              {bentoTracks.map((track, index) => (
+                <TouchableOpacity
+                  key={track.id}
+                  style={[styles.bentoCard, { width: BENTO_HALF }]}
+                  activeOpacity={0.8}
+                  onPress={() => handleTrackPress(trendingTracks!, index)}
+                >
+                  <Image source={{ uri: track.coverUrl }} style={styles.bentoImage} contentFit="cover" />
+                  <View style={styles.bentoTextWrap}>
+                    <Text style={styles.bentoTitle} numberOfLines={1}>{track.title}</Text>
+                    <Text style={styles.bentoSubtitle} numberOfLines={1}>{track.artist}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
 
-            {/* Ultra Bass FM — full width 5th card */}
-            <TouchableOpacity
-              style={styles.bentoCardFull}
-              activeOpacity={0.8}
-            >
-              <Image
-                source={ULTRA_BASS_IMAGE}
-                style={[styles.bentoFullImage]}
-                contentFit="cover"
-              />
-              <View style={styles.bentoFullOverlay}>
-                <Text style={styles.bentoFullTitle}>Ultra Bass FM</Text>
-                <Text style={styles.bentoFullSubtitle}>Electronic Hits</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
+              {fullWidthTrack && (
+                <TouchableOpacity
+                  style={styles.bentoCardFull}
+                  activeOpacity={0.8}
+                  onPress={() => handleTrackPress(trendingTracks!, 4)}
+                >
+                  <Image source={{ uri: fullWidthTrack.coverUrl }} style={styles.bentoFullImage} contentFit="cover" />
+                  <View style={styles.bentoFullOverlay}>
+                    <Text style={styles.bentoFullTitle}>{fullWidthTrack.title}</Text>
+                    <Text style={styles.bentoFullSubtitle}>{fullWidthTrack.artist}</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
         </View>
 
         {/* Top Artists */}
@@ -191,24 +248,18 @@ export default function HomeScreen() {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionHeading}>Top Artists</Text>
           </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.artistScroll}
-          >
-            {TOP_ARTISTS.map((a) => (
-              <TouchableOpacity key={a.id} style={styles.artistItem} activeOpacity={0.8}>
-                <View
-                  style={[
-                    styles.artistBorder,
-                    { borderColor: a.active ? colors.primary : 'rgba(0,0,0,0)' },
-                  ]}
-                >
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.artistScroll}>
+            {FALLBACK_ARTISTS.map((a) => (
+              <TouchableOpacity
+                key={a.id}
+                style={styles.artistItem}
+                activeOpacity={0.8}
+                onPress={() => handleArtistPress(a.name)}
+              >
+                <View style={[styles.artistBorder, { borderColor: a.active ? colors.primary : 'rgba(0,0,0,0)' }]}>
                   <Image source={a.image} style={styles.artistImage} contentFit="cover" />
                 </View>
-                <Text style={styles.artistName} numberOfLines={1}>
-                  {a.name}
-                </Text>
+                <Text style={styles.artistName} numberOfLines={1}>{a.name}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -220,18 +271,20 @@ export default function HomeScreen() {
             <Text style={styles.sectionHeading}>Made for you</Text>
           </View>
           <View style={styles.mixesRow}>
-            {PERSONAL_MIXES.map((mix) => (
-              <TouchableOpacity key={mix.id} style={styles.mixCard} activeOpacity={0.8}>
-                <Image
-                  source={mix.image}
-                  style={styles.mixImage}
-                  contentFit="cover"
-                  blurRadius={0}
-                />
-                <LinearGradient
-                  colors={['transparent', 'rgba(0,0,0,0.6)']}
-                  style={styles.mixOverlay}
-                />
+            {[
+              { title: 'Lo-fi Beats', subtitle: `${lofiTracks?.length || 0} songs`, tracks: lofiTracks, image: MIX_IMAGES[0] },
+              { title: 'Electronic Mix', subtitle: `${electronicTracks?.length || 0} songs`, tracks: electronicTracks, image: MIX_IMAGES[1] },
+            ].map((mix, idx) => (
+              <TouchableOpacity
+                key={idx}
+                style={[styles.mixCard, { width: MIX_CARD_W }]}
+                activeOpacity={0.8}
+                onPress={() => {
+                  if (mix.tracks?.length) handleTrackPress(mix.tracks, 0);
+                }}
+              >
+                <Image source={mix.image} style={styles.mixImage} contentFit="cover" />
+                <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={styles.mixOverlay} />
                 <View style={styles.mixInfo}>
                   <Text style={styles.mixTitle}>{mix.title}</Text>
                   <Text style={styles.mixSubtitle}>{mix.subtitle}</Text>
@@ -241,8 +294,32 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Bottom padding for mini player + tab bar */}
-        <View style={{ height: 200 }} />
+        {/* Recently Liked */}
+        {favorites.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionHeading}>Recently Liked</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+              {favorites.slice(0, 8).map((track) => (
+                <TouchableOpacity
+                  key={track.id}
+                  style={styles.likedChip}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    hapticLight();
+                    setQueue(favorites as any, favorites.findIndex((f) => f.id === track.id));
+                  }}
+                >
+                  <Image source={{ uri: track.coverUrl }} style={styles.likedChipImage} contentFit="cover" />
+                  <Text style={styles.likedChipTitle} numberOfLines={1}>{track.title}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        <View style={{ height: layout.bottomListPadding }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -258,7 +335,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.screenPadding,
     paddingVertical: 16,
   },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -285,23 +361,21 @@ const styles = StyleSheet.create({
     letterSpacing: -1.2,
   },
   profileBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    overflow: 'hidden',
-    backgroundColor: colors.input,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    padding: 2,
   },
-  profilePlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.input,
+  profileInner: {
+    flex: 1,
+    borderRadius: 19,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Hero
   heroCard: {
-    marginHorizontal: spacing.screenPadding,
-    height: 214,
     borderRadius: radii.xl,
     overflow: 'hidden',
     marginBottom: spacing.sectionGap,
@@ -310,14 +384,14 @@ const styles = StyleSheet.create({
   heroGradient: { ...StyleSheet.absoluteFillObject },
   heroContent: {
     position: 'absolute',
-    bottom: 32,
-    left: 32,
-    right: 32,
-    gap: 8,
+    bottom: 24,
+    left: 24,
+    right: 24,
+    gap: 4,
   },
   heroLabel: {
     color: colors.accent,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 2.4,
     lineHeight: 16,
@@ -326,10 +400,16 @@ const styles = StyleSheet.create({
   heroTitle: {
     color: colors.textPrimary,
     fontFamily: fonts.heading,
-    fontSize: 36,
+    fontSize: 32,
     fontWeight: '800',
     letterSpacing: -1.8,
-    lineHeight: 45,
+    lineHeight: 38,
+  },
+  heroArtist: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
   },
   heroActions: {
     flexDirection: 'row',
@@ -342,18 +422,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingVertical: 12,
-    paddingHorizontal: 32,
+    paddingHorizontal: 28,
     borderRadius: radii.pill,
   },
   heroPlayText: {
     color: colors.teal,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
   heroGlassBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.1)',
@@ -367,16 +447,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.screenPadding,
     marginBottom: 16,
   },
   sectionHeading: {
     color: colors.textPrimary,
-    fontFamily: fonts.subheading,
-    fontSize: 24,
+    fontFamily: fonts.heading,
+    fontSize: 22,
     fontWeight: '700',
     letterSpacing: -0.6,
-    lineHeight: 32,
+    lineHeight: 28,
   },
   viewAll: {
     color: colors.primary,
@@ -388,22 +467,20 @@ const styles = StyleSheet.create({
   bentoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: spacing.screenPadding,
-    gap: BENTO_GAP,
+    gap: 16,
   },
   bentoCard: {
-    width: BENTO_HALF,
     backgroundColor: colors.cardAlt,
     borderRadius: radii.xl,
-    padding: 16,
+    padding: 14,
   },
   bentoImage: {
     width: '100%',
-    height: 131,
+    height: 120,
     borderRadius: radii.xs,
   },
   bentoTextWrap: {
-    marginTop: 12,
+    marginTop: 10,
     alignItems: 'center',
   },
   bentoTitle: {
@@ -450,32 +527,30 @@ const styles = StyleSheet.create({
   },
 
   // Artists
-  artistScroll: { paddingHorizontal: spacing.screenPadding, gap: 20 },
-  artistItem: { alignItems: 'center', width: 96, gap: 8 },
+  artistScroll: { gap: 20 },
+  artistItem: { alignItems: 'center', width: 88, gap: 8 },
   artistBorder: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    padding: 6,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    padding: 4,
     borderWidth: 2,
     overflow: 'hidden',
   },
-  artistImage: { width: '100%', height: '100%', borderRadius: 42 },
+  artistImage: { width: '100%', height: '100%', borderRadius: 40 },
   artistName: {
     color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '600',
     textAlign: 'center',
   },
 
-  // Personal Mixes — Glass Cards
+  // Personal Mixes
   mixesRow: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.screenPadding,
     gap: 16,
   },
   mixCard: {
-    flex: 1,
     height: 200,
     borderRadius: radii.xl,
     overflow: 'hidden',
@@ -495,13 +570,33 @@ const styles = StyleSheet.create({
   },
   mixTitle: {
     color: colors.textPrimary,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
-    lineHeight: 24,
+    lineHeight: 22,
   },
   mixSubtitle: {
     color: colors.textSecondary,
     fontSize: 12,
     lineHeight: 16,
+  },
+
+  // Recently Liked
+  likedChip: {
+    width: 120,
+    backgroundColor: colors.card,
+    borderRadius: radii.md,
+    overflow: 'hidden',
+  },
+  likedChipImage: {
+    width: 120,
+    height: 120,
+    borderRadius: radii.md,
+  },
+  likedChipTitle: {
+    color: colors.textPrimary,
+    fontSize: 12,
+    fontWeight: '600',
+    padding: 8,
+    textAlign: 'center',
   },
 });

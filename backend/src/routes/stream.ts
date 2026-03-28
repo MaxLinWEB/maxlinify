@@ -9,6 +9,7 @@ streamRouter.get('/stream', async (req, res) => {
   try {
     const trackId = req.query.id as string;
     const source = req.query.source as string;
+    const skipCache = req.query.skipCache === 'true';
 
     if (!trackId || !source) {
       res.status(400).json({ error: 'id and source are required' });
@@ -16,10 +17,13 @@ streamRouter.get('/stream', async (req, res) => {
     }
 
     const cacheKey = `stream:${source}:${trackId}`;
-    const cached = getCached<TrackStream>(cacheKey);
-    if (cached) {
-      res.json(cached);
-      return;
+
+    if (!skipCache) {
+      const cached = getCached<TrackStream>(cacheKey);
+      if (cached) {
+        res.json(cached);
+        return;
+      }
     }
 
     const scraper = getScraperBySource(source);

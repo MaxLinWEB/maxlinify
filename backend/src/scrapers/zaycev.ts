@@ -115,7 +115,7 @@ class ZaycevScraper implements Scraper {
       // Try triggering playback
       try {
         await page.click('[class*="play"], .play-btn, .btn-play');
-        await page.waitForTimeout(2000);
+        await new Promise((r) => setTimeout(r, 2000));
       } catch {
         // Button not found
       }

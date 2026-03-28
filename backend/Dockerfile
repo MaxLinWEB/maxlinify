@@ -29,10 +29,15 @@ WORKDIR /app
 # Copy shared types (context is monorepo root via docker-compose)
 COPY shared/ /app/shared/
 COPY backend/package*.json ./
-RUN npm ci --only=production
+
+# Install all deps (including devDependencies for tsc build)
+RUN npm ci
 
 COPY backend/ .
 RUN npm run build
+
+# Remove devDependencies after build
+RUN npm prune --omit=dev
 
 EXPOSE 3000
 CMD ["node", "dist/server.js"]

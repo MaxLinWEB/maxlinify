@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Program Files/Google/Chrome/Application/**)",
+      "Read(//c/Program Files \\(x86\\)/Google/Chrome/Application/**)",
+      "Read(//c/Users/j2420/Desktop/Maxlinify/$LOCALAPPDATA/Google/Chrome/Application/**)",
+      "Bash(timeout 15 npx tsx src/server.ts)",
+      "Bash(npm view:*)",
+      "Bash(rm -rf node_modules package-lock.json)",
+      "Bash(npm install:*)",
+      "Bash(npx create-expo-app@latest --template blank-typescript _temp_expo)",
+      "Bash(npx expo:*)",
+      "Bash(npx kill-port:*)",
+      "Bash(node:*)",
+      "Bash(ls /c/Users/j2420/Desktop/Maxlinify/src/assets/*.png)",
+      "Bash(npx tsc:*)",
+      "Bash(for f:*)",
+      "Bash(do ls:*)",
+      "Bash(echo \"MISSING: $f\")",
+      "Bash(done)",
+      "Bash(git:*)"
+    ]
+  }
+}

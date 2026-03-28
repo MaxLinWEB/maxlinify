@@ -1,0 +1,17 @@
+# Ignore everything outside mobile
+../src
+../assets
+../guidelines
+../CLAUDE_CODE_PROMPT.md
+../ATTRIBUTIONS.md
+../.git
+
+# Ignore node_modules (EAS installs fresh)
+node_modules
+
+# Ignore dev files
+.expo
+dist
+*.log
+.env
+.env.*

@@ -22,7 +22,8 @@
       "Bash(ls /c/Users/j2420/Desktop/Maxlinify/mobile/assets/images/5ca*)",
       "Bash(ls /c/Users/j2420/Desktop/Maxlinify/mobile/assets/images/66*)",
       "Bash(ls *.jpg)",
-      "Bash(ls *.png)"
+      "Bash(ls *.png)",
+      "Bash(ls -la /c/Users/j2420/Desktop/Maxlinify/mobile/assets/images/5ca80e82823bf9531a84296107ea788e9b4ae244.*)"
     ]
   }
 }

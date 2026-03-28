@@ -23,17 +23,8 @@ function getBaseUrl(): string {
   const envUrl = process.env.EXPO_PUBLIC_API_URL;
   if (envUrl) return envUrl;
 
-  // 3. Development fallback — use your computer's local IP for physical devices
-  if (__DEV__) {
-    // Physical device: use local network IP
-    // Emulator: 10.0.2.2 maps to host localhost
-    const LOCAL_IP = '192.168.0.101';
-    return `http://${LOCAL_IP}:3000/api`;
-  }
-
-  // 4. Production — must be configured via env or app config
-  console.warn('[API] No production API URL configured. Set EXPO_PUBLIC_API_URL or extra.apiUrl.');
-  return 'http://192.168.0.101:3000/api';
+  // 3. Default — Render cloud backend
+  return 'https://maxlinify-1.onrender.com/api';
 }
 
 const BASE_URL = getBaseUrl();

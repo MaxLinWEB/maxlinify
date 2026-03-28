@@ -7,7 +7,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://10.0.2.2:3000/api"
+        "EXPO_PUBLIC_API_URL": "https://maxlinify-1.onrender.com/api"
       }
     },
     "preview": {
@@ -16,7 +16,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://10.0.2.2:3000/api"
+        "EXPO_PUBLIC_API_URL": "https://maxlinify-1.onrender.com/api"
       }
     },
     "production": {
@@ -24,7 +24,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.maxlinify.com/api"
+        "EXPO_PUBLIC_API_URL": "https://maxlinify-1.onrender.com/api"
       }
     }
   }

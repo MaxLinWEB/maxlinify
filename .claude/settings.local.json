@@ -18,7 +18,11 @@
       "Bash(do ls:*)",
       "Bash(echo \"MISSING: $f\")",
       "Bash(done)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(ls /c/Users/j2420/Desktop/Maxlinify/mobile/assets/images/5ca*)",
+      "Bash(ls /c/Users/j2420/Desktop/Maxlinify/mobile/assets/images/66*)",
+      "Bash(ls *.jpg)",
+      "Bash(ls *.png)"
     ]
   }
 }
